@@ -1,4 +1,4 @@
-export interface Snapshot {
+export interface Version {
   id: string;
   name: string;
   date: string;
@@ -11,7 +11,7 @@ export interface Project {
   creator: string;
   lastModified: string;
   tags: Record<string, string>;
-  snapshots: Snapshot[];
+  versions: Version[];
 }
 
 export interface Dimension {
@@ -72,7 +72,7 @@ export const PROJECTS: Project[] = [
     creator: "Wile E. Coyote",
     lastModified: "2026-02-28",
     tags: { stage: "Pilot", department: "Logistics", region: "Southwest", priority: "High" },
-    snapshots: [
+    versions: [
       { id: "s1a", name: "Initial concept", date: "2026-01-10" },
       { id: "s1b", name: "After stakeholder review", date: "2026-02-01" },
       { id: "s1c", name: "Pilot-ready draft", date: "2026-02-28" },
@@ -85,7 +85,7 @@ export const PROJECTS: Project[] = [
     creator: "Road Runner",
     lastModified: "2026-03-01",
     tags: { stage: "Discovery", department: "R&D", priority: "Medium" },
-    snapshots: [
+    versions: [
       { id: "s2a", name: "v1 draft", date: "2026-02-15" },
       { id: "s2b", name: "Updated metrics", date: "2026-03-01" },
     ],
@@ -97,7 +97,7 @@ export const PROJECTS: Project[] = [
     creator: "Foghorn Leghorn",
     lastModified: "2026-02-20",
     tags: { stage: "Scaling", department: "Compliance", region: "Northeast", priority: "High" },
-    snapshots: [
+    versions: [
       { id: "s3a", name: "Compliance framework v1", date: "2026-01-05" },
       { id: "s3b", name: "Audit-ready version", date: "2026-02-10" },
       { id: "s3c", name: "Post-audit revisions", date: "2026-02-20" },
@@ -110,7 +110,7 @@ export const PROJECTS: Project[] = [
     creator: "Wile E. Coyote",
     lastModified: "2026-03-02",
     tags: { stage: "Discovery", department: "Engineering", region: "Southwest" },
-    snapshots: [
+    versions: [
       { id: "s4a", name: "Proof of concept", date: "2026-03-02" },
     ],
   },
@@ -121,7 +121,7 @@ export const PROJECTS: Project[] = [
     creator: "Tweety Bird",
     lastModified: "2026-02-25",
     tags: { stage: "Pilot", department: "Supply Chain", region: "Midwest", priority: "Medium" },
-    snapshots: [
+    versions: [
       { id: "s5a", name: "Wireframes", date: "2026-01-20" },
       { id: "s5b", name: "Beta dashboard", date: "2026-02-25" },
     ],
@@ -133,7 +133,7 @@ export const PROJECTS: Project[] = [
     creator: "Yosemite Sam",
     lastModified: "2026-02-18",
     tags: { stage: "Scaling", department: "Agriculture", region: "Southwest", priority: "Low" },
-    snapshots: [
+    versions: [
       { id: "s6a", name: "Model v1", date: "2026-01-15" },
       { id: "s6b", name: "Accuracy improvements", date: "2026-02-05" },
       { id: "s6c", name: "Production deploy", date: "2026-02-18" },
@@ -146,7 +146,7 @@ export const PROJECTS: Project[] = [
     creator: "Road Runner",
     lastModified: "2026-03-03",
     tags: { stage: "Discovery", department: "Safety", priority: "High" },
-    snapshots: [
+    versions: [
       { id: "s7a", name: "Sensor spec draft", date: "2026-03-03" },
     ],
   },
@@ -157,7 +157,7 @@ export const PROJECTS: Project[] = [
     creator: "Daffy Duck",
     lastModified: "2026-02-22",
     tags: { stage: "Pilot", department: "Customer Service", region: "Northeast" },
-    snapshots: [
+    versions: [
       { id: "s8a", name: "Initial design", date: "2026-02-01" },
       { id: "s8b", name: "Customer feedback round", date: "2026-02-22" },
     ],

@@ -11,6 +11,44 @@ import { VariantB } from "./variant-b";
 
 type View = "grid" | "table";
 
+function SortControls({
+  sortValue,
+  sortDir,
+  dimensions,
+  onSortChange,
+  onDirToggle,
+}: {
+  sortValue: string;
+  sortDir: "asc" | "desc";
+  dimensions: Dimension[];
+  onSortChange: (val: string) => void;
+  onDirToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <select
+        value={sortValue}
+        onChange={(e) => onSortChange(e.target.value)}
+        className="border border-zinc-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-zinc-400"
+      >
+        <option value="lastModified">Date</option>
+        <option value="name">Name</option>
+        <option value="creator">Creator</option>
+        {dimensions.map((dim) => (
+          <option key={dim.id} value={`dim:${dim.id}`}>{dim.name}</option>
+        ))}
+      </select>
+      <button
+        onClick={onDirToggle}
+        className="text-xs px-1.5 py-1.5 border border-zinc-200 rounded-lg text-zinc-500 bg-white hover:bg-zinc-50 transition-colors"
+        title={`Sort ${sortDir === "asc" ? "ascending" : "descending"}`}
+      >
+        {sortDir === "asc" ? "\u2191" : "\u2193"}
+      </button>
+    </div>
+  );
+}
+
 function ColumnChooser({
   dimensions,
   visibleDimIds,
@@ -86,6 +124,8 @@ export default function PortfolioList() {
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [view, setView] = useState<View>("grid");
   const [showDimManager, setShowDimManager] = useState(false);
+  const [showToolbar, setShowToolbar] = useState(true);
+  const [toolbarMode, setToolbarMode] = useState<"collapsible" | "always">("collapsible");
   const [visibleDimIds, setVisibleDimIds] = useState<Set<string>>(() => new Set(INITIAL_DIMENSIONS.map((d) => d.id)));
 
   const filtered = useMemo(() => {
@@ -173,14 +213,14 @@ export default function PortfolioList() {
     });
   }
 
-  function addSnapshot(projectId: string, name: string) {
+  function addVersion(projectId: string, name: string) {
     setProjects((prev) =>
       prev.map((p) =>
         p.id === projectId
           ? {
               ...p,
-              snapshots: [
-                ...p.snapshots,
+              versions: [
+                ...p.versions,
                 { id: `s${p.id}-${Date.now()}`, name, date: new Date().toISOString().slice(0, 10) },
               ],
             }
@@ -235,21 +275,49 @@ export default function PortfolioList() {
 
   const visibleDimensions = dimensions.filter((d) => visibleDimIds.has(d.id));
 
-  return (
-    <main className="max-w-6xl mx-auto px-6 py-10">
-      <Link
-        href="/"
-        className="text-sm text-zinc-500 hover:text-zinc-700 transition-colors"
-      >
-        &larr; Back
-      </Link>
-      <h1 className="text-2xl font-bold mt-4 mb-1">Portfolio List</h1>
-      <p className="text-zinc-500 text-sm mb-6">
-        Enterprise innovation project portfolio — toggle between grid and table views.
-      </p>
+  const activeFilterCount = Object.values(activeFilters).reduce((sum, s) => sum + s.size, 0);
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-3">
+  const toolbarAlways = toolbarMode === "always";
+
+  return (
+    <>
+      {/* Proto meta bar — outside the prototype */}
+      <div className="bg-zinc-900 text-zinc-300 border-b border-zinc-700">
+        <div className="max-w-6xl mx-auto px-6 py-2 flex items-center gap-4">
+          <Link
+            href="/"
+            className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            &larr; Back
+          </Link>
+          <div className="w-px h-4 bg-zinc-700" />
+          <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Variants</span>
+          <div className="flex items-center gap-1">
+            {(["collapsible", "always"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setToolbarMode(mode)}
+                className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                  toolbarMode === mode
+                    ? "bg-zinc-700 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {mode === "collapsible" ? "Collapsible toolbar" : "Always-visible toolbar"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <main className="max-w-6xl mx-auto px-6 py-10">
+        <h1 className="text-2xl font-bold mb-1">Portfolio List</h1>
+        <p className="text-zinc-500 text-sm mb-6">
+          Enterprise innovation project portfolio — toggle between grid and table views.
+        </p>
+
+      {/* Toolbar row 1: search + actions (always visible) */}
+      <div className="flex items-center gap-3 mb-3">
         <input
           type="text"
           placeholder="Search projects..."
@@ -258,70 +326,81 @@ export default function PortfolioList() {
           className="border border-zinc-200 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-1 focus:ring-zinc-400"
         />
 
-        {/* Sort — always visible, visually distinct */}
-        <div className="flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-          </svg>
-          <select
-            value={view === "grid" ? sortBy : tableSortCol}
-            onChange={(e) => {
-              if (view === "grid") {
-                setSortBy(e.target.value);
-              } else {
-                setTableSortCol(e.target.value);
-                setTableSortDir("asc");
-              }
+        {/* In "always" mode, sort inline here */}
+        {toolbarAlways && (
+          <SortControls
+            sortValue={view === "grid" ? sortBy : tableSortCol}
+            sortDir={view === "grid" ? sortDir : tableSortDir}
+            dimensions={dimensions}
+            onSortChange={(val) => {
+              if (view === "grid") setSortBy(val);
+              else { setTableSortCol(val); setTableSortDir("asc"); }
             }}
-            className="border border-zinc-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-400"
-          >
-            <option value="lastModified">Date</option>
-            <option value="name">Name</option>
-            <option value="creator">Creator</option>
-            {dimensions.map((dim) => (
-              <option key={dim.id} value={`dim:${dim.id}`}>{dim.name}</option>
-            ))}
-          </select>
-          <button
-            onClick={() => {
+            onDirToggle={() => {
               if (view === "grid") setSortDir(sortDir === "asc" ? "desc" : "asc");
               else setTableSortDir(tableSortDir === "asc" ? "desc" : "asc");
             }}
-            className="text-xs px-1.5 py-1.5 border border-zinc-200 rounded-lg text-zinc-500 hover:bg-zinc-50 transition-colors"
-            title={`Sort ${(view === "grid" ? sortDir : tableSortDir) === "asc" ? "ascending" : "descending"}`}
-          >
-            {(view === "grid" ? sortDir : tableSortDir) === "asc" ? "\u2191" : "\u2193"}
-          </button>
-        </div>
+          />
+        )}
 
-        <div className="w-px h-5 bg-zinc-200" />
+        {/* In "collapsible" mode, toggle button + inline active filter chips */}
+        {!toolbarAlways && (
+          <>
+            <button
+              onClick={() => setShowToolbar(!showToolbar)}
+              className={`text-xs px-3 py-1.5 border rounded-lg flex items-center gap-1.5 transition-colors shrink-0 ${
+                showToolbar
+                  ? "border-zinc-400 bg-zinc-100 text-zinc-800"
+                  : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Sort & Filter
+            </button>
+            {activeFilterCount > 0 && dimensions.flatMap((dim) => {
+              const vals = activeFilters[dim.id];
+              if (!vals) return [];
+              return Array.from(vals).map((val) => (
+                <button
+                  key={`${dim.id}-${val}`}
+                  onClick={() => toggleFilter(dim.id, val)}
+                  className={`text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shrink-0 ${dim.color}`}
+                >
+                  {val}
+                  <svg className="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              ));
+            })}
+          </>
+        )}
 
-        {/* Filters */}
-        <FilterBar
-          dimensions={dimensions}
-          projects={projects}
-          activeFilters={activeFilters}
-          onToggleFilter={toggleFilter}
-        />
+        {/* "Always" mode: Dimensions button in top row */}
+        {toolbarAlways && (
+          <>
+            <div className="flex-1" />
+            <button
+              onClick={() => setShowDimManager(!showDimManager)}
+              className={`text-xs px-3 py-1.5 border rounded-lg flex items-center gap-1.5 transition-colors ${
+                showDimManager
+                  ? "border-zinc-400 bg-zinc-100 text-zinc-800"
+                  : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Dimensions
+            </button>
+          </>
+        )}
 
-        <div className="flex-1" />
+        {!toolbarAlways && <div className="flex-1" />}
 
-        <button
-          onClick={() => setShowDimManager(!showDimManager)}
-          className={`text-xs px-3 py-1.5 border rounded-lg flex items-center gap-1.5 transition-colors ${
-            showDimManager
-              ? "border-zinc-400 bg-zinc-100 text-zinc-800"
-              : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-          }`}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          Dimensions
-        </button>
-
-        {/* Column chooser — table view only */}
         {view === "table" && (
           <ColumnChooser
             dimensions={dimensions}
@@ -330,7 +409,6 @@ export default function PortfolioList() {
           />
         )}
 
-        {/* View toggle */}
         <div className="flex border border-zinc-200 rounded-lg overflow-hidden">
           <button
             onClick={() => setView("grid")}
@@ -357,6 +435,97 @@ export default function PortfolioList() {
         </div>
       </div>
 
+      {/* "Always" mode: filter row with inline chips */}
+      {toolbarAlways && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <FilterBar
+            dimensions={dimensions}
+            projects={projects}
+            activeFilters={activeFilters}
+            onToggleFilter={toggleFilter}
+          />
+          {activeFilterCount > 0 && (
+            <>
+              <div className="w-px h-5 bg-zinc-200 mx-1" />
+              {dimensions.flatMap((dim) => {
+                const vals = activeFilters[dim.id];
+                if (!vals) return [];
+                return Array.from(vals).map((val) => (
+                  <button
+                    key={`${dim.id}-${val}`}
+                    onClick={() => toggleFilter(dim.id, val)}
+                    className={`text-xs px-2.5 py-1 rounded-full flex items-center gap-1 ${dim.color}`}
+                  >
+                    {val}
+                    <svg className="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                ));
+              })}
+              <button
+                onClick={() => {
+                  for (const dim of dimensions) {
+                    const vals = activeFilters[dim.id];
+                    if (vals) for (const val of vals) toggleFilter(dim.id, val);
+                  }
+                }}
+                className="text-xs text-zinc-400 hover:text-zinc-600 ml-1 transition-colors"
+              >
+                Clear all
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* "Collapsible" mode: sort, filter & dimensions panel */}
+      {!toolbarAlways && showToolbar && (
+        <div className="relative mb-4 p-3 border border-zinc-200 rounded-lg bg-zinc-50/50">
+          <button
+            onClick={() => setShowDimManager(!showDimManager)}
+            className={`absolute top-3 right-3 p-1.5 rounded-lg transition-colors ${
+              showDimManager
+                ? "bg-zinc-200 text-zinc-700"
+                : "text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100"
+            }`}
+            title="Manage Dimensions"
+          >
+            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide w-10 shrink-0">Sort</span>
+              <SortControls
+                sortValue={view === "grid" ? sortBy : tableSortCol}
+                sortDir={view === "grid" ? sortDir : tableSortDir}
+                dimensions={dimensions}
+                onSortChange={(val) => {
+                  if (view === "grid") setSortBy(val);
+                  else { setTableSortCol(val); setTableSortDir("asc"); }
+                }}
+                onDirToggle={() => {
+                  if (view === "grid") setSortDir(sortDir === "asc" ? "desc" : "asc");
+                  else setTableSortDir(tableSortDir === "asc" ? "desc" : "asc");
+                }}
+              />
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide w-10 shrink-0 pt-1.5">Filter</span>
+              <FilterBar
+                dimensions={dimensions}
+                projects={projects}
+                activeFilters={activeFilters}
+                onToggleFilter={toggleFilter}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Dimension Manager */}
       {showDimManager && (
         <div className="mb-6">
@@ -372,22 +541,25 @@ export default function PortfolioList() {
       {/* Active view */}
       {view === "grid" ? (
         <VariantA
+          key={`${sortBy}-${sortDir}`}
           projects={filtered}
           dimensions={dimensions}
-          onAddSnapshot={addSnapshot}
+          onAddVersion={addVersion}
           onUpdateTag={updateTag}
         />
       ) : (
         <VariantB
+          key={`${tableSortCol}-${tableSortDir}`}
           projects={tableSorted}
           dimensions={visibleDimensions}
           onUpdateTag={updateTag}
-          onAddSnapshot={addSnapshot}
+          onAddVersion={addVersion}
           sortCol={tableSortCol}
           sortDir={tableSortDir}
           onSort={handleTableSort}
         />
       )}
     </main>
+    </>
   );
 }

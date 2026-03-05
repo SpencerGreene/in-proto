@@ -117,33 +117,6 @@ export function FilterBar({ dimensions, projects, activeFilters, onToggleFilter 
           onToggle={(val) => onToggleFilter(dim.id, val)}
         />
       ))}
-
-      {activeChips.length > 0 && (
-        <>
-          <div className="w-px h-5 bg-zinc-200 mx-1" />
-          {activeChips.map(({ dimensionId, dimensionName, value, color }) => (
-            <button
-              key={`${dimensionId}-${value}`}
-              onClick={() => onToggleFilter(dimensionId, value)}
-              className={`text-xs px-2.5 py-1 rounded-full flex items-center gap-1 ${color}`}
-            >
-              <span className="text-[10px] text-current/60">{dimensionName}:</span>
-              {value}
-              <svg className="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          ))}
-          <button
-            onClick={() => {
-              for (const chip of activeChips) onToggleFilter(chip.dimensionId, chip.value);
-            }}
-            className="text-xs text-zinc-400 hover:text-zinc-600 ml-1 transition-colors"
-          >
-            Clear all
-          </button>
-        </>
-      )}
     </div>
   );
 }

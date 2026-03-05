@@ -74,14 +74,12 @@ export function DimensionManager({ dimensions, onAdd, onUpdate, onDelete }: Dime
     <div className="border border-zinc-200 rounded-lg bg-zinc-50 p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-medium text-zinc-700">Manage Dimensions</div>
-        {!showForm && (
-          <button
-            onClick={startAdd}
-            className="text-xs px-2.5 py-1 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors"
-          >
-            + Add
-          </button>
-        )}
+        <button
+          onClick={startAdd}
+          className={`text-xs px-2.5 py-1 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors ${showForm ? "invisible" : ""}`}
+        >
+          + Add
+        </button>
       </div>
 
       <div className="space-y-1.5 mb-3">
