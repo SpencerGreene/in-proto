@@ -49,6 +49,8 @@ export default async function ProjectDetail({
     <>
       <ProtoBar backHref="/portfolio-list" />
       <main className="max-w-6xl mx-auto px-6 py-10">
+        <div className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-4">Project Homepage placeholder</div>
+
         {/* Header */}
         <div className="flex items-start gap-2 mb-8">
           <h1 className="text-lg font-semibold truncate">{project.name}</h1>
