@@ -1,24 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Project, Dimension } from "./data";
 
 interface VariantAProps {
   projects: Project[];
   dimensions: Dimension[];
   onAddVersion: (projectId: string, name: string) => void;
+  onRenameVersion: (projectId: string, versionId: string, newName: string) => void;
   onUpdateTag: (projectId: string, dimensionId: string, value: string) => void;
 }
 
 function InlineVersions({
   project,
   onAddVersion,
+  onRenameVersion,
 }: {
   project: Project;
   onAddVersion: (name: string) => void;
+  onRenameVersion: (versionId: string, newName: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   return (
     <div className="mt-3 pt-3 border-t border-zinc-100">
@@ -67,13 +73,45 @@ function InlineVersions({
       </div>
       <div className="space-y-1">
         {[...project.versions].reverse().map((snap, i) => (
-          <div key={snap.id} className="text-xs flex justify-between text-zinc-600">
-            <span>
-              {snap.name}
-              {i === 0 && (
-                <span className="ml-1.5 text-emerald-600 font-medium">active</span>
-              )}
-            </span>
+          <div key={snap.id} className="group/ver text-xs flex justify-between text-zinc-600">
+            {editingId === snap.id ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (editName.trim()) {
+                    onRenameVersion(snap.id, editName.trim());
+                    setEditingId(null);
+                  }
+                }}
+                className="flex items-center gap-1.5 flex-1"
+              >
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") setEditingId(null); }}
+                  className="border border-zinc-200 rounded px-1.5 py-0.5 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                />
+                <button type="submit" className="text-zinc-500 hover:text-zinc-700">Save</button>
+                <button type="button" onClick={() => setEditingId(null)} className="text-zinc-400 hover:text-zinc-600">Cancel</button>
+              </form>
+            ) : (
+              <span className="flex items-center gap-1">
+                {snap.name}
+                {i === 0 && (
+                  <span className="ml-1.5 text-emerald-600 font-medium">active</span>
+                )}
+                <button
+                  onClick={() => { setEditingId(snap.id); setEditName(snap.name); }}
+                  className="opacity-0 group-hover/ver:opacity-100 text-zinc-400 hover:text-zinc-600 transition-opacity ml-1"
+                  title="Rename"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              </span>
+            )}
             <span className="text-zinc-400">{snap.date}</span>
           </div>
         ))}
@@ -82,8 +120,9 @@ function InlineVersions({
   );
 }
 
-export function VariantA({ projects, dimensions, onAddVersion }: VariantAProps) {
+export function VariantA({ projects, dimensions, onAddVersion, onRenameVersion }: VariantAProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const router = useRouter();
 
   return (
     <div>
@@ -95,9 +134,10 @@ export function VariantA({ projects, dimensions, onAddVersion }: VariantAProps) 
           return (
             <div
               key={project.id}
-              className="border border-zinc-200 rounded-lg p-4 hover:border-zinc-300 transition-colors"
+              className="border border-zinc-200 rounded-lg p-4 hover:border-zinc-300 transition-colors cursor-pointer"
+              onClick={() => router.push(`/portfolio-list/${project.id}`)}
             >
-              <h3 className="font-semibold text-sm">{project.name}</h3>
+              <h3 className="font-semibold text-sm text-zinc-900 hover:text-blue-700 transition-colors">{project.name}</h3>
               <p className="text-xs text-zinc-500 mt-1">{project.description}</p>
 
               <div className="flex flex-wrap gap-1.5 mt-3">
@@ -115,32 +155,35 @@ export function VariantA({ projects, dimensions, onAddVersion }: VariantAProps) 
                 })}
               </div>
 
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-100">
-                <div className="text-xs text-zinc-400">
-                  {project.creator} &middot; {project.lastModified}
+              <div className="mt-3 pt-3 border-t border-zinc-100 flex items-start justify-between gap-3">
+                <div className="text-xs text-zinc-400 min-w-0">
+                  <div className="truncate">{project.creator}</div>
+                  <div>{project.lastModified}</div>
                 </div>
                 <button
-                  onClick={() => setExpandedId(expandedId === project.id ? null : project.id)}
-                  className="text-xs text-zinc-500 hover:text-zinc-700 flex items-center gap-1 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); setExpandedId(expandedId === project.id ? null : project.id); }}
+                  className="text-xs text-zinc-500 hover:text-zinc-700 text-right shrink-0 transition-colors"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {active ? active.name : "No versions"}
+                  <div className="flex items-center gap-1 justify-end">
+                    <span className="truncate max-w-[140px]">{active ? active.name : "No versions"}</span>
+                    <svg className={`w-3 h-3 text-zinc-400 shrink-0 transition-transform ${expandedId === project.id ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                   {olderCount > 0 && (
-                    <span className="text-zinc-400">&middot; {olderCount} older</span>
+                    <div className="text-zinc-400 text-[11px]">{olderCount} older</div>
                   )}
-                  <svg className={`w-3 h-3 text-zinc-400 transition-transform ${expandedId === project.id ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
                 </button>
               </div>
 
               {expandedId === project.id && (
+                <div onClick={(e) => e.stopPropagation()}>
                 <InlineVersions
                   project={project}
                   onAddVersion={(name) => onAddVersion(project.id, name)}
+                  onRenameVersion={(versionId, newName) => onRenameVersion(project.id, versionId, newName)}
                 />
+                </div>
               )}
             </div>
           );

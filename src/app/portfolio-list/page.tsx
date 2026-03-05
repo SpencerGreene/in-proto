@@ -1,15 +1,29 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import Link from "next/link";
-import { PROJECTS, INITIAL_DIMENSIONS } from "./data";
+import { PROJECTS, INITIAL_DIMENSIONS, DATA_SETS } from "./data";
 import type { Project, Dimension } from "./data";
 import { FilterBar } from "./filter-bar";
 import { DimensionManager } from "./dimension-manager";
+import { ProtoBar } from "./proto-bar";
 import { VariantA } from "./variant-a";
 import { VariantB } from "./variant-b";
 
 type View = "grid" | "table";
+
+const STORAGE_KEY = "portfolio-list-state";
+
+function loadState() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveState(state: Record<string, unknown>) {
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+}
 
 function SortControls({
   sortValue,
@@ -75,16 +89,16 @@ function ColumnChooser({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className={`text-xs px-3 py-1.5 border rounded-lg flex items-center gap-1.5 transition-colors ${
-          open ? "border-zinc-400 bg-zinc-100 text-zinc-800" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+        className={`relative p-1.5 border rounded-lg transition-colors ${
+          open ? "border-zinc-400 bg-zinc-100 text-zinc-800" : "border-zinc-200 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50"
         }`}
+        title="Columns"
       >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
         </svg>
-        Columns
         {hiddenCount > 0 && (
-          <span className="text-[10px] text-zinc-400">({hiddenCount} hidden)</span>
+          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-zinc-800 text-white text-[9px] flex items-center justify-center">{hiddenCount}</span>
         )}
       </button>
 
@@ -116,17 +130,45 @@ function ColumnChooser({
 }
 
 export default function PortfolioList() {
-  const [projects, setProjects] = useState<Project[]>(PROJECTS);
-  const [dimensions, setDimensions] = useState<Dimension[]>(INITIAL_DIMENSIONS);
-  const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("lastModified");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
-  const [view, setView] = useState<View>("grid");
-  const [showDimManager, setShowDimManager] = useState(false);
-  const [showToolbar, setShowToolbar] = useState(true);
-  const [toolbarMode, setToolbarMode] = useState<"collapsible" | "always">("collapsible");
-  const [visibleDimIds, setVisibleDimIds] = useState<Set<string>>(() => new Set(INITIAL_DIMENSIONS.map((d) => d.id)));
+  const saved = loadState();
+  const [dataSetIndex, setDataSetIndex] = useState(() => saved?.dataSetIndex ?? 0);
+  const initDs = saved?.dataSetIndex != null ? DATA_SETS[saved.dataSetIndex] : null;
+  const [projects, setProjects] = useState<Project[]>(() => initDs?.projects ?? PROJECTS);
+  const [dimensions, setDimensions] = useState<Dimension[]>(() => initDs?.dimensions ?? INITIAL_DIMENSIONS);
+  const [search, setSearch] = useState(() => saved?.search ?? "");
+  const [sortBy, setSortBy] = useState(() => saved?.sortBy ?? "lastModified");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(() => saved?.sortDir ?? "desc");
+  const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>(() => {
+    if (saved?.activeFilters) {
+      const restored: Record<string, Set<string>> = {};
+      for (const [k, v] of Object.entries(saved.activeFilters)) restored[k] = new Set(v as string[]);
+      return restored;
+    }
+    return {};
+  });
+  const [view, setView] = useState<View>(() => saved?.view ?? "table");
+  const [showDimManager, setShowDimManager] = useState(() => saved?.showDimManager ?? false);
+  const [showToolbar, setShowToolbar] = useState(() => saved?.showToolbar ?? false);
+  const [toolbarMode, setToolbarMode] = useState<"collapsible" | "always">(() => saved?.toolbarMode ?? "collapsible");
+  const [visibleDimIds, setVisibleDimIds] = useState<Set<string>>(() => {
+    if (saved?.visibleDimIds) return new Set(saved.visibleDimIds as string[]);
+    return new Set((initDs?.dimensions ?? INITIAL_DIMENSIONS).map((d) => d.id));
+  });
+
+  function switchDataSet(index: number) {
+    const ds = DATA_SETS[index];
+    setDataSetIndex(index);
+    setProjects([...ds.projects]);
+    setDimensions([...ds.dimensions]);
+    setVisibleDimIds(new Set(ds.dimensions.map((d) => d.id)));
+    setActiveFilters({});
+    setSearch("");
+    setSortBy("lastModified");
+    setSortDir("desc");
+    setTableSortCol("lastModified");
+    setTableSortDir("desc");
+    setShowDimManager(false);
+  }
 
   const filtered = useMemo(() => {
     let result = projects.filter((p) => {
@@ -160,8 +202,8 @@ export default function PortfolioList() {
   }, [projects, search, sortBy, sortDir, activeFilters]);
 
   // For table view: sort can target dimension columns too
-  const [tableSortCol, setTableSortCol] = useState<string>("lastModified");
-  const [tableSortDir, setTableSortDir] = useState<"asc" | "desc">("desc");
+  const [tableSortCol, setTableSortCol] = useState<string>(() => saved?.tableSortCol ?? "lastModified");
+  const [tableSortDir, setTableSortDir] = useState<"asc" | "desc">(() => saved?.tableSortDir ?? "desc");
 
   const tableSorted = useMemo(() => {
     let result = projects.filter((p) => {
@@ -193,6 +235,17 @@ export default function PortfolioList() {
 
     return result;
   }, [projects, search, tableSortCol, tableSortDir, activeFilters]);
+
+  useEffect(() => {
+    const filtersObj: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(activeFilters)) filtersObj[k] = Array.from(v);
+    saveState({
+      dataSetIndex, search, sortBy, sortDir, view, showDimManager, showToolbar,
+      toolbarMode, tableSortCol, tableSortDir,
+      visibleDimIds: Array.from(visibleDimIds),
+      activeFilters: filtersObj,
+    });
+  }, [dataSetIndex, search, sortBy, sortDir, activeFilters, view, showDimManager, showToolbar, toolbarMode, visibleDimIds, tableSortCol, tableSortDir]);
 
   function handleTableSort(col: string) {
     if (tableSortCol === col) setTableSortDir(tableSortDir === "asc" ? "desc" : "asc");
@@ -227,6 +280,25 @@ export default function PortfolioList() {
           : p
       )
     );
+  }
+
+  function renameVersion(projectId: string, versionId: string, newName: string) {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              versions: p.versions.map((v) =>
+                v.id === versionId ? { ...v, name: newName } : v
+              ),
+            }
+          : p
+      )
+    );
+  }
+
+  function deleteProject(projectId: string) {
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
   }
 
   function updateTag(projectId: string, dimensionId: string, value: string) {
@@ -281,43 +353,47 @@ export default function PortfolioList() {
 
   return (
     <>
-      {/* Proto meta bar — outside the prototype */}
-      <div className="bg-zinc-900 text-zinc-300 border-b border-zinc-700">
-        <div className="max-w-6xl mx-auto px-6 py-2 flex items-center gap-4">
-          <Link
-            href="/"
-            className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
-          >
-            &larr; Back
-          </Link>
-          <div className="w-px h-4 bg-zinc-700" />
-          <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Variants</span>
-          <div className="flex items-center gap-1">
-            {(["collapsible", "always"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setToolbarMode(mode)}
-                className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                  toolbarMode === mode
-                    ? "bg-zinc-700 text-zinc-100"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                {mode === "collapsible" ? "Collapsible toolbar" : "Always-visible toolbar"}
-              </button>
-            ))}
-          </div>
+      <ProtoBar>
+        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Data</span>
+        <div className="flex items-center gap-1">
+          {DATA_SETS.map((ds, i) => (
+            <button
+              key={ds.label}
+              onClick={() => switchDataSet(i)}
+              className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                dataSetIndex === i
+                  ? "bg-zinc-700 text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              {ds.label}
+            </button>
+          ))}
         </div>
-      </div>
+        <div className="w-px h-4 bg-zinc-700" />
+        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Toolbar</span>
+        <div className="flex items-center gap-1">
+          {(["collapsible", "always"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setToolbarMode(mode)}
+              className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                toolbarMode === mode
+                  ? "bg-zinc-700 text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              {mode === "collapsible" ? "Collapsible" : "Always-visible"}
+            </button>
+          ))}
+        </div>
+      </ProtoBar>
 
       <main className="max-w-6xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-bold mb-1">Portfolio List</h1>
-        <p className="text-zinc-500 text-sm mb-6">
-          Enterprise innovation project portfolio — toggle between grid and table views.
-        </p>
+        <h1 className="text-2xl font-bold mb-6">{DATA_SETS[dataSetIndex].label} Portfolio</h1>
 
       {/* Toolbar row 1: search + actions (always visible) */}
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-start gap-3 mb-3">
         <input
           type="text"
           placeholder="Search projects..."
@@ -359,22 +435,32 @@ export default function PortfolioList() {
               </svg>
               Sort & Filter
             </button>
-            {activeFilterCount > 0 && dimensions.flatMap((dim) => {
-              const vals = activeFilters[dim.id];
-              if (!vals) return [];
-              return Array.from(vals).map((val) => (
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap gap-1.5 flex-1 min-w-0 items-center">
+                {dimensions.flatMap((dim) => {
+                  const vals = activeFilters[dim.id];
+                  if (!vals) return [];
+                  return Array.from(vals).map((val) => (
+                    <button
+                      key={`${dim.id}-${val}`}
+                      onClick={() => toggleFilter(dim.id, val)}
+                      className={`text-xs px-2.5 py-1 rounded-full flex items-center gap-1 ${dim.color}`}
+                    >
+                      {val}
+                      <svg className="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  ));
+                })}
                 <button
-                  key={`${dim.id}-${val}`}
-                  onClick={() => toggleFilter(dim.id, val)}
-                  className={`text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shrink-0 ${dim.color}`}
+                  onClick={() => { for (const dim of dimensions) { const vals = activeFilters[dim.id]; if (vals) for (const val of vals) toggleFilter(dim.id, val); } }}
+                  className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors"
                 >
-                  {val}
-                  <svg className="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  Clear all
                 </button>
-              ));
-            })}
+              </div>
+            )}
           </>
         )}
 
@@ -399,7 +485,7 @@ export default function PortfolioList() {
           </>
         )}
 
-        {!toolbarAlways && <div className="flex-1" />}
+        {!toolbarAlways && activeFilterCount === 0 && <div className="flex-1" />}
 
         {view === "table" && (
           <ColumnChooser
@@ -411,17 +497,6 @@ export default function PortfolioList() {
 
         <div className="flex border border-zinc-200 rounded-lg overflow-hidden">
           <button
-            onClick={() => setView("grid")}
-            className={`p-1.5 transition-colors ${
-              view === "grid" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50"
-            }`}
-            title="Card grid"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-          </button>
-          <button
             onClick={() => setView("table")}
             className={`p-1.5 transition-colors ${
               view === "table" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50"
@@ -430,6 +505,17 @@ export default function PortfolioList() {
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setView("grid")}
+            className={`p-1.5 transition-colors ${
+              view === "grid" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50"
+            }`}
+            title="Card grid"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
           </button>
         </div>
@@ -545,6 +631,7 @@ export default function PortfolioList() {
           projects={filtered}
           dimensions={dimensions}
           onAddVersion={addVersion}
+          onRenameVersion={renameVersion}
           onUpdateTag={updateTag}
         />
       ) : (
@@ -552,8 +639,9 @@ export default function PortfolioList() {
           key={`${tableSortCol}-${tableSortDir}`}
           projects={tableSorted}
           dimensions={visibleDimensions}
-          onUpdateTag={updateTag}
           onAddVersion={addVersion}
+          onRenameVersion={renameVersion}
+          onDeleteProject={deleteProject}
           sortCol={tableSortCol}
           sortDir={tableSortDir}
           onSort={handleTableSort}
