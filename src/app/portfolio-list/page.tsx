@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { PROJECTS, INITIAL_DIMENSIONS, DATA_SETS } from "./data";
 import type { Project, Dimension } from "./data";
 import { FilterBar } from "./filter-bar";
 import { DimensionManager } from "./dimension-manager";
 import { ProtoBar } from "./proto-bar";
 import { VariantA } from "./variant-a";
 import { VariantB } from "./variant-b";
+import { useDataSetContext } from "./dataset-context";
 
 type View = "grid" | "table";
 
@@ -131,33 +131,69 @@ function ColumnChooser({
 
 export default function PortfolioList() {
   const saved = loadState();
-  const [dataSetIndex, setDataSetIndex] = useState(() => saved?.dataSetIndex ?? 0);
-  const initDs = saved?.dataSetIndex != null ? DATA_SETS[saved.dataSetIndex] : null;
-  const [projects, setProjects] = useState<Project[]>(() => initDs?.projects ?? PROJECTS);
-  const [dimensions, setDimensions] = useState<Dimension[]>(() => initDs?.dimensions ?? INITIAL_DIMENSIONS);
+  const { allDataSets, authed, activeDataSetIndex, setActiveDataSetIndex, authenticate, deauthenticate } = useDataSetContext();
+  const [authInput, setAuthInput] = useState("");
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authError, setAuthError] = useState(false);
+  const authRef = useRef<HTMLDivElement>(null);
+
+  // Close auth popover on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (authRef.current && !authRef.current.contains(e.target as Node)) {
+        setAuthOpen(false);
+        setAuthInput("");
+        setAuthError(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const dataSetIndex = activeDataSetIndex;
+  const initDs = allDataSets[dataSetIndex] ?? allDataSets[0];
+  const [projects, setProjects] = useState<Project[]>(initDs.projects);
+  const [dimensions, setDimensions] = useState<Dimension[]>(initDs.dimensions);
   const [search, setSearch] = useState(() => saved?.search ?? "");
   const [sortBy, setSortBy] = useState(() => saved?.sortBy ?? "lastModified");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => saved?.sortDir ?? "desc");
-  const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>(() => {
-    if (saved?.activeFilters) {
-      const restored: Record<string, Set<string>> = {};
-      for (const [k, v] of Object.entries(saved.activeFilters)) restored[k] = new Set(v as string[]);
-      return restored;
-    }
-    return {};
-  });
+  const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [view, setView] = useState<View>(() => saved?.view ?? "table");
-  const [showDimManager, setShowDimManager] = useState(() => saved?.showDimManager ?? false);
-  const [showToolbar, setShowToolbar] = useState(() => saved?.showToolbar ?? false);
+  const [showDimManager, setShowDimManager] = useState(false);
+  const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarMode, setToolbarMode] = useState<"collapsible" | "always">(() => saved?.toolbarMode ?? "collapsible");
-  const [visibleDimIds, setVisibleDimIds] = useState<Set<string>>(() => {
-    if (saved?.visibleDimIds) return new Set(saved.visibleDimIds as string[]);
-    return new Set((initDs?.dimensions ?? INITIAL_DIMENSIONS).map((d) => d.id));
-  });
+  const [visibleDimIds, setVisibleDimIds] = useState<Set<string>>(
+    () => new Set(initDs.dimensions.map((d) => d.id))
+  );
+
+  // When auth is lost and context resets index, sync local data state
+  useEffect(() => {
+    const ds = allDataSets[dataSetIndex] ?? allDataSets[0];
+    setProjects([...ds.projects]);
+    setDimensions([...ds.dimensions]);
+    setVisibleDimIds(new Set(ds.dimensions.map((d) => d.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataSetIndex, allDataSets]);
+
+  async function handleAuth() {
+    const ok = await authenticate(authInput);
+    if (ok) {
+      setAuthInput("");
+      setAuthOpen(false);
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+    }
+  }
+
+  function handleDeauth() {
+    deauthenticate();
+    setAuthOpen(false);
+  }
 
   function switchDataSet(index: number) {
-    const ds = DATA_SETS[index];
-    setDataSetIndex(index);
+    const ds = allDataSets[index];
+    setActiveDataSetIndex(index);
     setProjects([...ds.projects]);
     setDimensions([...ds.dimensions]);
     setVisibleDimIds(new Set(ds.dimensions.map((d) => d.id)));
@@ -356,7 +392,7 @@ export default function PortfolioList() {
       <ProtoBar>
         <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Data</span>
         <div className="flex items-center gap-1">
-          {DATA_SETS.map((ds, i) => (
+          {allDataSets.map((ds, i) => (
             <button
               key={ds.label}
               onClick={() => switchDataSet(i)}
@@ -370,6 +406,54 @@ export default function PortfolioList() {
             </button>
           ))}
         </div>
+
+        {/* Auth toggle */}
+        <div className="relative" ref={authRef}>
+          <button
+            onClick={() => {
+              if (authed) handleDeauth();
+              else setAuthOpen(!authOpen);
+            }}
+            className={`p-1 rounded transition-colors ${
+              authed
+                ? "text-emerald-400 hover:text-emerald-300"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
+            title={authed ? "Lock (hide client data)" : "Unlock client data"}
+          >
+            {authed ? (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            )}
+          </button>
+          {authOpen && !authed && (
+            <div className="absolute z-50 top-full mt-1.5 right-0 bg-zinc-800 border border-zinc-600 rounded-lg shadow-lg p-2 flex items-center gap-1.5">
+              <input
+                type="password"
+                value={authInput}
+                onChange={(e) => { setAuthInput(e.target.value); setAuthError(false); }}
+                onKeyDown={(e) => e.key === "Enter" && handleAuth()}
+                placeholder="Password"
+                autoFocus
+                className={`w-28 text-xs px-2 py-1 rounded bg-zinc-700 text-zinc-100 placeholder-zinc-500 border focus:outline-none focus:ring-1 ${
+                  authError ? "border-red-500 focus:ring-red-500" : "border-zinc-600 focus:ring-zinc-400"
+                }`}
+              />
+              <button
+                onClick={handleAuth}
+                className="text-xs px-2 py-1 rounded bg-zinc-600 text-zinc-200 hover:bg-zinc-500 transition-colors"
+              >
+                Go
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="w-px h-4 bg-zinc-700" />
         <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Toolbar</span>
         <div className="flex items-center gap-1">
@@ -390,7 +474,7 @@ export default function PortfolioList() {
       </ProtoBar>
 
       <main className="max-w-6xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-bold mb-6">{DATA_SETS[dataSetIndex].label} Portfolio</h1>
+        <h1 className="text-2xl font-bold mb-6">{allDataSets[dataSetIndex]?.label ?? "Acme Corp"} Portfolio</h1>
 
       {/* Toolbar row 1: search + actions (always visible) */}
       <div className="flex items-start gap-3 mb-3">

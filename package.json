@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "encrypt-data": "npx tsx scripts/encrypt-data.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.1",

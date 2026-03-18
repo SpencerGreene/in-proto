@@ -1,13 +1,8 @@
-import { DATA_SETS } from "../data";
-import { ProtoBar } from "../proto-bar";
+"use client";
 
-function findProject(id: string) {
-  for (const ds of DATA_SETS) {
-    const p = ds.projects.find((p) => p.id === id);
-    if (p) return { project: p, dimensions: ds.dimensions };
-  }
-  return null;
-}
+import { useParams } from "next/navigation";
+import { useDataSetContext } from "../dataset-context";
+import { ProtoBar } from "../proto-bar";
 
 function NavRow({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
@@ -23,15 +18,17 @@ function NavRow({ icon, label }: { icon: React.ReactNode; label: string }) {
   );
 }
 
-export default async function ProjectDetail({
-  params,
-}: {
-  params: Promise<{ projectId: string }>;
-}) {
-  const { projectId } = await params;
-  const result = findProject(projectId);
+export default function ProjectDetail() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { allDataSets } = useDataSetContext();
 
-  if (!result) {
+  let project = null;
+  for (const ds of allDataSets) {
+    const p = ds.projects.find((p) => p.id === projectId);
+    if (p) { project = p; break; }
+  }
+
+  if (!project) {
     return (
       <>
         <ProtoBar backHref="/portfolio-list" />
@@ -42,8 +39,6 @@ export default async function ProjectDetail({
       </>
     );
   }
-
-  const { project } = result;
 
   return (
     <>
