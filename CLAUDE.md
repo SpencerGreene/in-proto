@@ -10,3 +10,4 @@
 - UI prototype sandbox — each sub-page is a separate prototype
 - No database; front-end only
 - To add a new proto: create a folder under `src/app/`, add entry to `protos` array in `src/app/page.tsx`
+- Restricted datasets (encrypted): see `data/README.md` for how to edit, add, or change the password
