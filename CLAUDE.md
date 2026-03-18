@@ -11,3 +11,4 @@
 - No database; front-end only
 - To add a new proto: create a folder under `src/app/`, add entry to `protos` array in `src/app/page.tsx`
 - Restricted datasets (encrypted): see `data/README.md` for how to edit, add, or change the password
+- The dark top bar (ProtoBar) is prototype scaffolding for switching variants/datasets — it is NOT part of the product spec. `spec-portfolio-list.md` covers only the actual product UI, not the proto bar controls.
