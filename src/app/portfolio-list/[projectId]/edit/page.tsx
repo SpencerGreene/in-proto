@@ -1,23 +1,21 @@
-import { DATA_SETS } from "../../data";
+"use client";
+
+import { useParams } from "next/navigation";
+import { useDataSetContext } from "../../dataset-context";
 import { ProtoBar } from "../../proto-bar";
 
-function findProject(id: string) {
-  for (const ds of DATA_SETS) {
-    const p = ds.projects.find((p) => p.id === id);
-    if (p) return { project: p, dimensions: ds.dimensions };
+export default function EditProject() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { allDataSets } = useDataSetContext();
+
+  let project = null;
+  let dimensions = null;
+  for (const ds of allDataSets) {
+    const p = ds.projects.find((p) => p.id === projectId);
+    if (p) { project = p; dimensions = ds.dimensions; break; }
   }
-  return null;
-}
 
-export default async function EditProject({
-  params,
-}: {
-  params: Promise<{ projectId: string }>;
-}) {
-  const { projectId } = await params;
-  const result = findProject(projectId);
-
-  if (!result) {
+  if (!project || !dimensions) {
     return (
       <>
         <ProtoBar backHref="/portfolio-list" />
@@ -28,8 +26,6 @@ export default async function EditProject({
       </>
     );
   }
-
-  const { project, dimensions } = result;
 
   return (
     <>
@@ -60,7 +56,7 @@ export default async function EditProject({
                 <div key={dim.id}>
                   <label className="block text-xs text-zinc-500 mb-1">{dim.name}</label>
                   <div className="border border-zinc-200 rounded px-3 py-2 text-sm text-zinc-400 bg-zinc-50">
-                    {project.tags[dim.id] || "—"}
+                    {project.tags[dim.id] || "\u2014"}
                   </div>
                 </div>
               ))}
