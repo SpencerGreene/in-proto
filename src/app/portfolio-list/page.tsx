@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { PROJECTS, INITIAL_DIMENSIONS } from "./data";
 import type { Project, Dimension } from "./data";
 import { FilterBar } from "./filter-bar";
 import { DimensionManager } from "./dimension-manager";
@@ -132,7 +131,7 @@ function ColumnChooser({
 
 export default function PortfolioList() {
   const saved = loadState();
-  const { allDataSets, authed, authenticate, deauthenticate } = useDataSetContext();
+  const { allDataSets, authed, activeDataSetIndex, setActiveDataSetIndex, authenticate, deauthenticate } = useDataSetContext();
   const [authInput, setAuthInput] = useState("");
   const [authOpen, setAuthOpen] = useState(false);
   const [authError, setAuthError] = useState(false);
@@ -151,9 +150,10 @@ export default function PortfolioList() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const [dataSetIndex, setDataSetIndex] = useState(0);
-  const [projects, setProjects] = useState<Project[]>(PROJECTS);
-  const [dimensions, setDimensions] = useState<Dimension[]>(INITIAL_DIMENSIONS);
+  const dataSetIndex = activeDataSetIndex;
+  const initDs = allDataSets[dataSetIndex] ?? allDataSets[0];
+  const [projects, setProjects] = useState<Project[]>(initDs.projects);
+  const [dimensions, setDimensions] = useState<Dimension[]>(initDs.dimensions);
   const [search, setSearch] = useState(() => saved?.search ?? "");
   const [sortBy, setSortBy] = useState(() => saved?.sortBy ?? "lastModified");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => saved?.sortDir ?? "desc");
@@ -163,16 +163,17 @@ export default function PortfolioList() {
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarMode, setToolbarMode] = useState<"collapsible" | "always">(() => saved?.toolbarMode ?? "collapsible");
   const [visibleDimIds, setVisibleDimIds] = useState<Set<string>>(
-    () => new Set(INITIAL_DIMENSIONS.map((d) => d.id))
+    () => new Set(initDs.dimensions.map((d) => d.id))
   );
 
-  // When auth is lost, switch back to Acme Corp if on a restricted dataset
+  // When auth is lost and context resets index, sync local data state
   useEffect(() => {
-    if (!authed && dataSetIndex > 0) {
-      switchDataSet(0);
-    }
+    const ds = allDataSets[dataSetIndex] ?? allDataSets[0];
+    setProjects([...ds.projects]);
+    setDimensions([...ds.dimensions]);
+    setVisibleDimIds(new Set(ds.dimensions.map((d) => d.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed]);
+  }, [dataSetIndex, allDataSets]);
 
   async function handleAuth() {
     const ok = await authenticate(authInput);
@@ -192,7 +193,7 @@ export default function PortfolioList() {
 
   function switchDataSet(index: number) {
     const ds = allDataSets[index];
-    setDataSetIndex(index);
+    setActiveDataSetIndex(index);
     setProjects([...ds.projects]);
     setDimensions([...ds.dimensions]);
     setVisibleDimIds(new Set(ds.dimensions.map((d) => d.id)));
